@@ -20,7 +20,7 @@
         android:layout_width="wrap_content"
         android:layout_height="wrap_content"
         android:layout_marginTop="32dp"
-        android:text="0.00"
+        android:text="No Tracking"
         app:layout_constraintStart_toEndOf="@+id/tv_labellat"
         app:layout_constraintTop_toTopOf="parent" />
 
@@ -38,7 +38,7 @@
         android:layout_width="wrap_content"
         android:layout_height="wrap_content"
         android:layout_marginTop="16dp"
-        android:text="0.00"
+        android:text="No Tracking"
         app:layout_constraintStart_toEndOf="@+id/tv_labellon"
         app:layout_constraintTop_toBottomOf="@+id/tv_lat" />
 
@@ -55,7 +55,7 @@
         android:id="@+id/tv_altitude"
         android:layout_width="wrap_content"
         android:layout_height="wrap_content"
-        android:text="0.00"
+        android:text="No Tracking"
         app:layout_constraintStart_toEndOf="@+id/tv_labelaltitude"
         app:layout_constraintTop_toTopOf="@+id/tv_labelaltitude" />
 
@@ -72,85 +72,15 @@
         android:id="@+id/tv_accuracy"
         android:layout_width="wrap_content"
         android:layout_height="wrap_content"
-        android:text="0.00"
+        android:text="No Tracking"
         app:layout_constraintStart_toEndOf="@+id/tv_labelaccuracy"
         app:layout_constraintTop_toTopOf="@+id/tv_labelaccuracy" />
-
-    <TextView
-        android:id="@+id/tv_labelspeed"
-        android:layout_width="100dp"
-        android:layout_height="wrap_content"
-        android:layout_marginTop="16dp"
-        android:text="Speed:"
-        app:layout_constraintStart_toStartOf="parent"
-        app:layout_constraintTop_toBottomOf="@+id/tv_labelaccuracy" />
-
-    <TextView
-        android:id="@+id/tv_speed"
-        android:layout_width="wrap_content"
-        android:layout_height="wrap_content"
-        android:text="0.00"
-        app:layout_constraintStart_toEndOf="@+id/tv_labelspeed"
-        app:layout_constraintTop_toTopOf="@+id/tv_labelspeed" />
-
-    <TextView
-        android:id="@+id/tv_labelsensor"
-        android:layout_width="100dp"
-        android:layout_height="wrap_content"
-        android:layout_marginTop="16dp"
-        android:text="Sensor:"
-        app:layout_constraintStart_toStartOf="parent"
-        app:layout_constraintTop_toBottomOf="@+id/sw_gps" />
-
-    <TextView
-        android:id="@+id/tv_sensor"
-        android:layout_width="wrap_content"
-        android:layout_height="wrap_content"
-        android:text="Cell Tower + Wifi"
-        app:layout_constraintStart_toEndOf="@+id/tv_labelsensor"
-        app:layout_constraintTop_toTopOf="@+id/tv_labelsensor" />
-
-    <TextView
-        android:id="@+id/tv_labelupdates"
-        android:layout_width="100dp"
-        android:layout_height="wrap_content"
-        android:text="Updates:"
-        app:layout_constraintStart_toStartOf="parent"
-        app:layout_constraintTop_toBottomOf="@+id/sw_locationsupdates" />
-
-    <TextView
-        android:id="@+id/tv_updates"
-        android:layout_width="wrap_content"
-        android:layout_height="wrap_content"
-        android:text="Off"
-        app:layout_constraintStart_toEndOf="@+id/tv_labelupdates"
-        app:layout_constraintTop_toTopOf="@+id/tv_labelupdates" />
-
-    <Switch
-        android:id="@+id/sw_locationsupdates"
-        android:layout_width="wrap_content"
-        android:layout_height="wrap_content"
-        android:layout_marginTop="16dp"
-        android:checked="true"
-        android:text="Location Updates"
-        app:layout_constraintEnd_toEndOf="parent"
-        app:layout_constraintStart_toStartOf="parent"
-        app:layout_constraintTop_toBottomOf="@+id/divider" />
-
-    <Switch
-        android:id="@+id/sw_gps"
-        android:layout_width="wrap_content"
-        android:layout_height="wrap_content"
-        android:layout_marginTop="16dp"
-        android:text="GPS/SavePower"
-        app:layout_constraintEnd_toEndOf="parent"
-        app:layout_constraintStart_toStartOf="parent"
-        app:layout_constraintTop_toBottomOf="@+id/tv_labelupdates" />
 
     <TextView
         android:id="@+id/tv_address"
         android:layout_width="wrap_content"
         android:layout_height="wrap_content"
+        android:text="No Tracking"
         app:layout_constraintStart_toEndOf="@+id/tv_lbladdress"
         app:layout_constraintTop_toTopOf="@+id/tv_lbladdress" />
 
@@ -161,7 +91,24 @@
         android:layout_marginTop="16dp"
         android:text="Address:"
         app:layout_constraintStart_toStartOf="parent"
-        app:layout_constraintTop_toBottomOf="@+id/tv_labelspeed" />
+        app:layout_constraintTop_toBottomOf="@+id/tv_labelaccuracy" />
+
+    <TextView
+        android:id="@+id/tv_wifi"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:text="No Tracking"
+        app:layout_constraintStart_toEndOf="@+id/tv_lblwifi"
+        app:layout_constraintTop_toTopOf="@+id/tv_lblwifi" />
+
+    <TextView
+        android:id="@+id/tv_lblwifi"
+        android:layout_width="100dp"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="16dp"
+        android:text="Wifi:"
+        app:layout_constraintStart_toStartOf="parent"
+        app:layout_constraintTop_toBottomOf="@+id/tv_lbladdress" />
 
     <View
         android:id="@+id/divider"
@@ -169,7 +116,18 @@
         android:layout_height="1dp"
         android:layout_marginTop="32dp"
         android:background="?android:attr/listDivider"
-        app:layout_constraintTop_toBottomOf="@+id/tv_address"
+        app:layout_constraintTop_toBottomOf="@+id/tv_lblwifi"
+        app:layout_constraintStart_toStartOf="parent"
         tools:layout_editor_absoluteX="1dp" />
+
+    <Switch
+        android:id="@+id/sw_scan"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="16dp"
+        android:text="Scan"
+        app:layout_constraintEnd_toEndOf="parent"
+        app:layout_constraintStart_toStartOf="parent"
+        app:layout_constraintTop_toBottomOf="@+id/divider" />
 
 </androidx.constraintlayout.widget.ConstraintLayout>

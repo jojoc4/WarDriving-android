@@ -2,126 +2,134 @@ package ch.jojoc4.wardriving
 
 import android.Manifest
 import android.annotation.SuppressLint
+import android.content.BroadcastReceiver
+import android.content.Context
+import android.content.Intent
+import android.content.IntentFilter
 import android.content.pm.PackageManager
-import android.location.Address
 import android.location.Geocoder
 import android.location.Location
+import android.net.wifi.WifiManager
 import android.os.Build
 import androidx.appcompat.app.AppCompatActivity
 import android.os.Bundle
 import android.os.Looper
-import android.view.View
 import android.widget.Switch
 import android.widget.TextView
 import android.widget.Toast
 import androidx.core.app.ActivityCompat
 import com.google.android.gms.location.*
-import com.google.android.gms.tasks.OnSuccessListener
 
 class MainActivity() : AppCompatActivity() {
 
-    private val PERMISSIONS_FINE_LOCATION: Int = 99
-    private val DEFAULT_UPDATE_INTERVAL: Long = 3000
-    private val FASTEST_UPDATE_INTERVAL: Long = 1000
+    private val PERMISSIONS_ALL: Int = 99
+    private val SCAN_INTERVAL: Long = 30000
 
+    //callback functions
     private lateinit var locationCallback: LocationCallback
-
+    private lateinit var wifiScanCallback: BroadcastReceiver
 
     //UI vars
-    private lateinit var sw_locationsupdates: Switch
-    private lateinit var sw_gps: Switch
+    private lateinit var sw_scan: Switch
     private lateinit var tv_accuracy: TextView
     private lateinit var tv_lat: TextView
     private lateinit var tv_address: TextView
     private lateinit var tv_altitude: TextView
     private lateinit var tv_longitude: TextView
-    private lateinit var tv_sensor: TextView
-    private lateinit var tv_speed: TextView
-    private lateinit var tv_updates: TextView
-
-    //used to remember if tracking is on or off
-    private var updateOn = false
+    private lateinit var tv_wifi: TextView
 
     //Location request config file
     private lateinit var locationRequest: LocationRequest
 
-
     //Google location service API
     private lateinit var fusedLocationProviderClient: FusedLocationProviderClient
+
+    //keeps last location
+    private lateinit var lastLocation: Location
+
+    //Wifi manager
+    private lateinit var wifiManager: WifiManager
 
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         setContentView(R.layout.activity_main)
 
+        //get UI elements
         tv_lat = findViewById<TextView>(R.id.tv_lat)
         tv_accuracy = findViewById<TextView>(R.id.tv_accuracy)
         tv_address = findViewById<TextView>(R.id.tv_address)
         tv_altitude = findViewById<TextView>(R.id.tv_altitude)
         tv_longitude = findViewById<TextView>(R.id.tv_lon)
-        tv_sensor = findViewById<TextView>(R.id.tv_sensor)
-        tv_speed = findViewById<TextView>(R.id.tv_speed)
-        tv_updates = findViewById<TextView>(R.id.tv_updates)
-        sw_gps = findViewById<Switch>(R.id.sw_gps)
-        sw_locationsupdates = findViewById<Switch>(R.id.sw_locationsupdates)
+        tv_wifi = findViewById<TextView>(R.id.tv_wifi)
+        sw_scan = findViewById<Switch>(R.id.sw_scan)
 
         // set location request properties
         locationRequest = LocationRequest.create()?.apply {
-            interval = DEFAULT_UPDATE_INTERVAL
-            fastestInterval = FASTEST_UPDATE_INTERVAL
-            priority = LocationRequest.PRIORITY_BALANCED_POWER_ACCURACY
+            interval = SCAN_INTERVAL
+            fastestInterval = SCAN_INTERVAL
+            priority = LocationRequest.PRIORITY_HIGH_ACCURACY
         }
 
-        //set precision setting
-        sw_gps.setOnClickListener {
-            if(sw_gps.isChecked()){
-                locationRequest.setPriority(LocationRequest.PRIORITY_HIGH_ACCURACY)
-                tv_sensor.setText("Using GPS")
+        //Get wifi manager
+        wifiManager = this.getSystemService(Context.WIFI_SERVICE) as WifiManager
+
+        //setup scan toogle
+        sw_scan.setOnClickListener {
+            if(sw_scan.isChecked()){
+                startScan()
             }else{
-                locationRequest.setPriority(LocationRequest.PRIORITY_BALANCED_POWER_ACCURACY)
-                tv_sensor.setText("Not using GPS")
+                stopScan()
             }
         }
 
-        sw_locationsupdates.setOnClickListener {
-            if(sw_locationsupdates.isChecked()){
-                startLocationUpdate()
-            }else{
-                stopLocationUpdate()
-            }
-        }
+        //make first scan
+        initialScan()
 
-        updateGPS()
-
-
+        //setup location callback
         locationCallback = object : LocationCallback() {
             override fun onLocationResult(p0: LocationResult) {
                 for (location in p0.locations){
-                    updateUIValues(location)
+                    lastLocation=location
+                    wifiManager.startScan()
                 }
 
             }
         }
 
+        //setup wifi callback
+        wifiScanCallback = object : BroadcastReceiver() {
+            override fun onReceive(context: Context, intent: Intent) {
+                val success = intent.getBooleanExtra(WifiManager.EXTRA_RESULTS_UPDATED, false)
+                if (success) {
+                    scanSuccess()
+                }
+            }
+        }
+
+        //connect to wifi update broadcast
+        val intentFilter = IntentFilter()
+        intentFilter.addAction(WifiManager.SCAN_RESULTS_AVAILABLE_ACTION)
+        registerReceiver(wifiScanCallback, intentFilter)
+
+
+
     }
 
     @SuppressLint("MissingPermission")
-    private fun startLocationUpdate() {
-        tv_updates.setText("Location is being tracked")
+    private fun startScan() {
         fusedLocationProviderClient.requestLocationUpdates(locationRequest, locationCallback, Looper.getMainLooper())
-        updateGPS()
+        initialScan()
     }
 
-    private fun stopLocationUpdate() {
+    private fun stopScan() {
         fusedLocationProviderClient.removeLocationUpdates(locationCallback)
-        tv_updates.setText("Location is not being tracked")
-        tv_longitude.setText("Not Tracking location")
-        tv_lat.setText("Not Tracking location")
-        tv_accuracy.setText("Not Tracking location")
-        tv_altitude.setText("Not Tracking location")
-        tv_speed.setText("Not Tracking location")
-        tv_address.setText("Not Tracking location")
-        tv_sensor.setText("Not Tracking location")
+        tv_longitude.setText("No Tracking")
+        tv_lat.setText("No Tracking")
+        tv_accuracy.setText("No Tracking")
+        tv_altitude.setText("No Tracking")
+        tv_address.setText("No Tracking")
+        tv_wifi.setText("No Tracking")
     }
 
     override fun onRequestPermissionsResult(
@@ -132,37 +140,62 @@ class MainActivity() : AppCompatActivity() {
         super.onRequestPermissionsResult(requestCode, permissions, grantResults)
 
         when (requestCode){
-            PERMISSIONS_FINE_LOCATION -> {
-                if(grantResults[0] == PackageManager.PERMISSION_GRANTED){
-                    updateGPS()
+            PERMISSIONS_ALL -> {
+                if(
+                    grantResults[0] == PackageManager.PERMISSION_GRANTED
+                    && grantResults[1] == PackageManager.PERMISSION_GRANTED
+                    && grantResults[2] == PackageManager.PERMISSION_GRANTED
+                ){
+                    initialScan()
                 }else{
-                    Toast.makeText(this, "You must grant location permission for this app to work", Toast.LENGTH_LONG)
+                    Toast.makeText(this, "You must grant permissions for this app to work", Toast.LENGTH_LONG)
                     finish()
                 }
             }
         }
     }
 
-    private fun updateGPS() {
-        //get permission
+    private fun initialScan() {
+        //get permissions
         //get current loc from fused
         //update ui
         fusedLocationProviderClient = LocationServices.getFusedLocationProviderClient(this)
 
-        if(ActivityCompat.checkSelfPermission(this, Manifest.permission.ACCESS_FINE_LOCATION) == PackageManager.PERMISSION_GRANTED){
+        if(
+            ActivityCompat.checkSelfPermission(this, Manifest.permission.ACCESS_FINE_LOCATION) == PackageManager.PERMISSION_GRANTED
+            && ActivityCompat.checkSelfPermission(this, Manifest.permission.ACCESS_WIFI_STATE) == PackageManager.PERMISSION_GRANTED
+            && ActivityCompat.checkSelfPermission(this, Manifest.permission.CHANGE_WIFI_STATE) == PackageManager.PERMISSION_GRANTED
+        ){
             fusedLocationProviderClient!!.lastLocation.addOnSuccessListener { location: Location? ->
                 if (location != null) {
-                    updateUIValues(location)
+                    lastLocation = location
+                    updateUIValues(lastLocation, "launch scan")
                 }
             }
         }else{
             if(Build.VERSION.SDK_INT >= Build.VERSION_CODES.M){
-                requestPermissions(arrayOf(Manifest.permission.ACCESS_FINE_LOCATION), PERMISSIONS_FINE_LOCATION)
+                requestPermissions(arrayOf(
+                    Manifest.permission.ACCESS_FINE_LOCATION,
+                    Manifest.permission.ACCESS_WIFI_STATE,
+                    Manifest.permission.CHANGE_WIFI_STATE
+                ), PERMISSIONS_ALL)
             }
         }
     }
 
-    private fun updateUIValues(location: Location) {
+
+    private fun scanSuccess() {
+        val results = wifiManager.scanResults
+        var wifi = ""
+        for(result in results){
+            wifi+=result.SSID+"; "
+        }
+        updateUIValues(lastLocation, wifi)
+        //TODO save results to file
+    }
+
+
+    private fun updateUIValues(location: Location, wifi: String) {
         tv_lat.setText(location.latitude.toString())
         tv_longitude.setText(location.longitude.toString())
         tv_accuracy.setText(location.accuracy.toString())
@@ -171,11 +204,6 @@ class MainActivity() : AppCompatActivity() {
             tv_altitude.setText(location.altitude.toString())
         }else{
             tv_altitude.setText("Not available")
-        }
-        if(location.hasSpeed()) {
-            tv_speed.setText(location.speed.toString())
-        }else{
-            tv_speed.setText("Not available")
         }
 
         var geocoder = Geocoder(this)
@@ -186,5 +214,7 @@ class MainActivity() : AppCompatActivity() {
         }catch (e: Exception){
             tv_address.setText("No address detected")
         }
+
+        tv_wifi.setText(wifi)
     }
 }
