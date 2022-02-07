@@ -2,23 +2,24 @@ package ch.jojoc4.wardriving
 
 import android.Manifest
 import android.annotation.SuppressLint
-import android.content.BroadcastReceiver
-import android.content.Context
-import android.content.Intent
-import android.content.IntentFilter
+import android.content.*
 import android.content.pm.PackageManager
+import android.database.DatabaseUtils
 import android.location.Geocoder
 import android.location.Location
+import android.net.wifi.ScanResult
 import android.net.wifi.WifiManager
 import android.os.Build
-import androidx.appcompat.app.AppCompatActivity
 import android.os.Bundle
 import android.os.Looper
+import android.widget.Button
 import android.widget.Switch
 import android.widget.TextView
 import android.widget.Toast
+import androidx.appcompat.app.AppCompatActivity
 import androidx.core.app.ActivityCompat
 import com.google.android.gms.location.*
+
 
 class MainActivity() : AppCompatActivity() {
 
@@ -37,6 +38,8 @@ class MainActivity() : AppCompatActivity() {
     private lateinit var tv_altitude: TextView
     private lateinit var tv_longitude: TextView
     private lateinit var tv_wifi: TextView
+    private lateinit var tv_db: TextView
+    private lateinit var btn_clean: Button
 
     //Location request config file
     private lateinit var locationRequest: LocationRequest
@@ -50,6 +53,9 @@ class MainActivity() : AppCompatActivity() {
     //Wifi manager
     private lateinit var wifiManager: WifiManager
 
+    //Database helper
+    private lateinit var dbHelper: WDDbHelper
+
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -62,7 +68,10 @@ class MainActivity() : AppCompatActivity() {
         tv_altitude = findViewById<TextView>(R.id.tv_altitude)
         tv_longitude = findViewById<TextView>(R.id.tv_lon)
         tv_wifi = findViewById<TextView>(R.id.tv_wifi)
+        tv_db = findViewById<TextView>(R.id.tv_db)
         sw_scan = findViewById<Switch>(R.id.sw_scan)
+        btn_clean = findViewById<Switch>(R.id.btn_clean)
+
 
         // set location request properties
         locationRequest = LocationRequest.create()?.apply {
@@ -73,6 +82,15 @@ class MainActivity() : AppCompatActivity() {
 
         //Get wifi manager
         wifiManager = this.getSystemService(Context.WIFI_SERVICE) as WifiManager
+
+        //setup db
+        dbHelper = WDDbHelper(this)
+
+        //count records in db
+        var db = dbHelper.readableDatabase
+        val numRows = DatabaseUtils.queryNumEntries(db, "entry").toInt()
+        tv_db.setText(numRows.toString())
+
 
         //setup scan toogle
         sw_scan.setOnClickListener {
@@ -112,7 +130,13 @@ class MainActivity() : AppCompatActivity() {
         intentFilter.addAction(WifiManager.SCAN_RESULTS_AVAILABLE_ACTION)
         registerReceiver(wifiScanCallback, intentFilter)
 
-
+        //setup cleaning button
+        btn_clean.setOnClickListener {
+            var db = dbHelper.writableDatabase
+            db.execSQL("DELETE from 'entry'")
+            val numRows = DatabaseUtils.queryNumEntries(db, "entry").toInt()
+            tv_db.setText(numRows.toString())
+        }
 
     }
 
@@ -191,9 +215,41 @@ class MainActivity() : AppCompatActivity() {
             wifi+=result.SSID+"; "
         }
         updateUIValues(lastLocation, wifi)
-        //TODO save results to file
+        saveToDb(lastLocation, results)
     }
 
+    private fun saveToDb(location: Location, results: List<ScanResult>){
+        //get db access
+        var db = dbHelper.writableDatabase
+
+        //prepare location string
+        var geocoder = Geocoder(this)
+        val loc = "{" +
+                "lon" + location.longitude +
+                "lat" + location.latitude +
+                "alt" + location.altitude +
+                "add" + geocoder.getFromLocation(location.latitude, location.longitude, 1).get(0).getAddressLine(0) +
+                "}"
+
+        for (wifi in results){
+            val w = "{" +
+                    "ssid" + wifi.SSID +
+                    "bssid" + wifi.BSSID +
+                    "freq" + wifi.frequency +
+                    "level" + wifi.level +
+                    "}"
+
+            val values = ContentValues().apply {
+                put("location", loc)
+                put("wifi", w)
+            }
+
+            db.insert("entry", null, values)
+            var nbr = tv_db.text.toString().toInt()+1
+            tv_db.setText(nbr.toString())
+        }
+
+    }
 
     private fun updateUIValues(location: Location, wifi: String) {
         tv_lat.setText(location.latitude.toString())
