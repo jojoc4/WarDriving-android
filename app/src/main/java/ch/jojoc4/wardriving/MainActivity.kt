@@ -225,18 +225,18 @@ class MainActivity() : AppCompatActivity() {
         //prepare location string
         var geocoder = Geocoder(this)
         val loc = "{" +
-                "lon" + location.longitude +
-                "lat" + location.latitude +
-                "alt" + location.altitude +
-                "add" + geocoder.getFromLocation(location.latitude, location.longitude, 1).get(0).getAddressLine(0) +
+                "\"lon\": " + location.longitude + ","
+                "\"lat\": " + location.latitude + ","
+                "\"alt\": " + location.altitude + ","
+                "\"address\": \"" + geocoder.getFromLocation(location.latitude, location.longitude, 1).get(0).getAddressLine(0) + "\","
                 "}"
 
         for (wifi in results){
             val w = "{" +
-                    "ssid" + wifi.SSID +
-                    "bssid" + wifi.BSSID +
-                    "freq" + wifi.frequency +
-                    "level" + wifi.level +
+                    "\"ssid\": \"" + wifi.SSID + "\","
+                    "\"bssid\": \"" + wifi.BSSID + "\","
+                    "\"freq\": " + wifi.frequency + ","
+                    "\"level\": " + wifi.level + ","
                     "}"
 
             val values = ContentValues().apply {
