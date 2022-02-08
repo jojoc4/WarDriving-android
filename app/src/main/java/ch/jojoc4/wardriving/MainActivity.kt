@@ -12,13 +12,20 @@ import android.net.wifi.WifiManager
 import android.os.Build
 import android.os.Bundle
 import android.os.Looper
+import android.util.Log
 import android.widget.Button
 import android.widget.Switch
 import android.widget.TextView
 import android.widget.Toast
 import androidx.appcompat.app.AppCompatActivity
 import androidx.core.app.ActivityCompat
+import com.android.volley.Request
+import com.android.volley.Response
+import com.android.volley.toolbox.StringRequest
+import com.android.volley.toolbox.Volley
 import com.google.android.gms.location.*
+import java.nio.charset.Charset
+import java.util.*
 
 
 class MainActivity() : AppCompatActivity() {
@@ -40,6 +47,7 @@ class MainActivity() : AppCompatActivity() {
     private lateinit var tv_wifi: TextView
     private lateinit var tv_db: TextView
     private lateinit var btn_clean: Button
+    private lateinit var btn_send: Button
 
     //Location request config file
     private lateinit var locationRequest: LocationRequest
@@ -71,6 +79,7 @@ class MainActivity() : AppCompatActivity() {
         tv_db = findViewById<TextView>(R.id.tv_db)
         sw_scan = findViewById<Switch>(R.id.sw_scan)
         btn_clean = findViewById<Switch>(R.id.btn_clean)
+        btn_send = findViewById<Switch>(R.id.btn_send)
 
 
         // set location request properties
@@ -136,6 +145,11 @@ class MainActivity() : AppCompatActivity() {
             db.execSQL("DELETE from 'entry'")
             val numRows = DatabaseUtils.queryNumEntries(db, "entry").toInt()
             tv_db.setText(numRows.toString())
+        }
+
+        //setup sending button
+        btn_send.setOnClickListener {
+            send()
         }
 
     }
@@ -225,18 +239,19 @@ class MainActivity() : AppCompatActivity() {
         //prepare location string
         var geocoder = Geocoder(this)
         val loc = "{" +
-                "\"lon\": " + location.longitude + ","
-                "\"lat\": " + location.latitude + ","
-                "\"alt\": " + location.altitude + ","
-                "\"address\": \"" + geocoder.getFromLocation(location.latitude, location.longitude, 1).get(0).getAddressLine(0) + "\","
+                "\"lon\": " + location.longitude + "," +
+                "\"lat\": " + location.latitude + "," +
+                "\"alt\": " + location.altitude + "," +
+                "\"address\": \"" + geocoder.getFromLocation(location.latitude, location.longitude, 1).get(0).getAddressLine(0) + "\"," +
+                "\"datetime\": \"" + Calendar.getInstance().time + "\"" +
                 "}"
 
         for (wifi in results){
             val w = "{" +
-                    "\"ssid\": \"" + wifi.SSID + "\","
-                    "\"bssid\": \"" + wifi.BSSID + "\","
-                    "\"freq\": " + wifi.frequency + ","
-                    "\"level\": " + wifi.level + ","
+                    "\"ssid\": \"" + wifi.SSID + "\"," +
+                    "\"bssid\": \"" + wifi.BSSID + "\"," +
+                    "\"freq\": " + wifi.frequency + "," +
+                    "\"level\": " + wifi.level +
                     "}"
 
             val values = ContentValues().apply {
@@ -273,4 +288,56 @@ class MainActivity() : AppCompatActivity() {
 
         tv_wifi.setText(wifi)
     }
+
+
+    private fun send() {
+        var db = dbHelper.writableDatabase
+        val queue = Volley.newRequestQueue(this)
+        //val url = "http://192.168.1.120/api/ingest.php"
+        //val url = "https://webhook.site/b09f2fc9-e337-431d-b7b2-3e8b1858e8d8"
+        val url = "https://wardriving.jojoc4.ch/api/injest.php"
+        var errors = false
+        var body = "{"
+        var nb = -1
+
+        var cursor = db.rawQuery("SELECT * FROM entry", null);
+        if(cursor.moveToFirst()){
+            do{
+                nb++
+                if(nb>0){
+                    body += ", "
+                }
+                body += "\"" + nb.toString() + "\": {\"loc\": " + cursor.getString(1) + ", \"wifi\": " + cursor.getString(2) + "}"
+            } while(cursor.moveToNext())
+        }
+        cursor.close()
+
+        body += "}"
+
+        if(nb>=0) {
+            val requestBody = "entry=" + body
+            val stringReq: StringRequest =
+                object : StringRequest(Method.POST, url,
+                    Response.Listener { response ->
+                    },
+                    Response.ErrorListener { error ->
+                        errors = true
+                        Toast.makeText(this, error.toString(), Toast.LENGTH_LONG)
+                    }
+                ) {
+                    override fun getBody(): ByteArray {
+                        return requestBody.toByteArray(Charset.defaultCharset())
+                    }
+                }
+            queue.add(stringReq)
+
+            if (!errors) {
+                db.execSQL("delete from entry");
+                val numRows = DatabaseUtils.queryNumEntries(db, "entry").toInt()
+                tv_db.setText(numRows.toString())
+            }
+        }
+    }
+
+
 }
